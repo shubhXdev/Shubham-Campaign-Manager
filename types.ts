@@ -1,23 +1,24 @@
 export interface CampaignResponse {
   id: string;
-  timestamp: string; // ISO string or format from Google Forms
-  name: string; // Mapped from "Campaign Incharge"
+  timestamp: string; 
+  name: string; 
   email: string;
-  location: string; // Mapped from "Place 1"
-  message: string; // Mapped from "Any Remark"
-  photoUrls: string[]; // Changed to array
-  videoUrls: string[]; // Changed to array
+  location: string; 
+  message: string; 
+  photoUrls: string[]; 
+  videoUrls: string[]; 
   sentiment?: 'positive' | 'neutral' | 'negative';
   tags?: string[];
-  // Specific fields for this campaign sheet
   staffInvolved?: string;
   pamphletsUsed?: string;
-  dateOfDrive?: string; // Mapped from "Date" column
+  dateOfDrive?: string;
+  // Dynamic container for any other columns in the Google Sheet
+  extraFields: Record<string, string>;
 }
 
 export interface DateRange {
-  startDate: string; // YYYY-MM-DD
-  endDate: string; // YYYY-MM-DD
+  startDate: string; 
+  endDate: string; 
 }
 
 export interface FilterState {

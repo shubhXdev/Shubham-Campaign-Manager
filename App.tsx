@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { CampaignResponse, FilterState, ViewMode, MediaItem } from './types';
-import { fetchCampaignData } from './utils/helpers';
+import { fetchCampaignData, extractSheetId, DEFAULT_SHEET_ID } from './utils/helpers';
 import { DateRangePicker } from './components/DateRangePicker';
 import { ResponseCard } from './components/ResponseCard';
 import { MediaPreview } from './components/MediaPreview';
@@ -17,7 +17,10 @@ import {
   Video,
   RefreshCcw,
   Hexagon,
-  Cpu
+  Cpu,
+  Settings,
+  Save,
+  Link as LinkIcon
 } from 'lucide-react';
 
 interface PreviewState {
@@ -30,6 +33,12 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.GRID);
+  
+  // Sheet Configuration State
+  const [sheetId, setSheetId] = useState<string>(() => localStorage.getItem('campaign_sheet_id') || DEFAULT_SHEET_ID);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsUrl, setSettingsUrl] = useState('');
+
   const [filter, setFilter] = useState<FilterState>({
     dateRange: { startDate: '', endDate: '' },
     searchQuery: '',
@@ -45,7 +54,7 @@ const App: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const realData = await fetchCampaignData();
+      const realData = await fetchCampaignData(sheetId);
       if (realData.length === 0) {
         console.warn("No data fetched. Sheet might be empty.");
         setData([]);
@@ -64,7 +73,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [sheetId]);
 
   const filteredData = useMemo(() => {
     return data.filter(item => {
@@ -123,6 +132,24 @@ const App: React.FC = () => {
     }
   };
 
+  const saveSettings = () => {
+    const extracted = extractSheetId(settingsUrl);
+    if (extracted) {
+      setSheetId(extracted);
+      localStorage.setItem('campaign_sheet_id', extracted);
+      setShowSettings(false);
+      setSettingsUrl('');
+    } else {
+      alert("Invalid Google Sheet URL or ID");
+    }
+  };
+
+  const resetSettings = () => {
+    setSheetId(DEFAULT_SHEET_ID);
+    localStorage.removeItem('campaign_sheet_id');
+    setShowSettings(false);
+  };
+
   return (
     <div className="min-h-screen flex flex-col font-sans text-slate-800 bg-slate-50/50">
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm no-print">
@@ -146,6 +173,15 @@ const App: React.FC = () => {
                 <p className="font-mono font-bold text-lg leading-none text-slate-700">{filteredData.length}</p>
               </div>
               <div className="h-8 w-px bg-slate-200"></div>
+              
+              <button 
+                onClick={() => setShowSettings(true)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-colors"
+                title="Configuration"
+              >
+                <Settings size={20} />
+              </button>
+
               <button 
                 onClick={loadData}
                 disabled={loading}
@@ -168,6 +204,12 @@ const App: React.FC = () => {
               <div>
                 <h3 className="font-semibold text-sm">Data Source Alert</h3>
                 <p className="text-sm opacity-90">{error}</p>
+                <button 
+                  onClick={() => setShowSettings(true)} 
+                  className="mt-2 text-xs font-bold underline hover:text-amber-900"
+                >
+                  Check Sheet Configuration
+                </button>
               </div>
             </div>
           )}
@@ -247,7 +289,7 @@ const App: React.FC = () => {
           ) : filteredData.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
               <AlertCircle size={32} className="mb-2 opacity-50" />
-              <p>No responses found.</p>
+              <p>No responses found matching your filters.</p>
               <button 
                 onClick={() => setFilter({ dateRange: { startDate: '', endDate: '' }, searchQuery: '', hasMedia: false })}
                 className="mt-4 text-orange-600 font-medium hover:underline text-sm"
@@ -366,8 +408,9 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* AI Analysis Modal */}
       {showAnalysisModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 no-print">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 no-print animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[80vh]">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
               <div className="flex items-center gap-2 text-indigo-700">
@@ -407,6 +450,69 @@ const App: React.FC = () => {
                 className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 no-print animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full flex flex-col">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <div className="flex items-center gap-2 text-slate-900">
+                <Settings size={20} />
+                <h3 className="font-bold text-lg">Configuration</h3>
+              </div>
+              <button 
+                onClick={() => setShowSettings(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <span className="sr-only">Close</span>
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Google Sheet URL or ID</label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-3 top-3 text-slate-400" size={16} />
+                  <input 
+                    type="text" 
+                    value={settingsUrl}
+                    onChange={(e) => setSettingsUrl(e.target.value)}
+                    placeholder="https://docs.google.com/spreadsheets/d/..." 
+                    className="w-full pl-9 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  Paste the full URL of your Google Form Responses sheet. Ensure the sheet is 
+                  <span className="font-medium text-slate-700"> Published to Web</span> (File &gt; Share &gt; Publish to web) or shared with "Anyone with the link".
+                </p>
+                {sheetId !== DEFAULT_SHEET_ID && (
+                  <div className="mt-4 p-3 bg-blue-50 text-blue-800 rounded-lg text-xs flex items-center justify-between">
+                     <span>Currently using custom sheet ID: {sheetId.substring(0, 10)}...</span>
+                     <button onClick={resetSettings} className="text-blue-600 hover:text-blue-800 underline">Reset to Default</button>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-xl flex justify-end gap-3">
+              <button 
+                onClick={() => setShowSettings(false)}
+                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={saveSettings}
+                className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors flex items-center gap-2"
+              >
+                <Save size={16} />
+                Save & Reload
               </button>
             </div>
           </div>
